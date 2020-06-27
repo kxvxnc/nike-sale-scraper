@@ -3,8 +3,9 @@ import urllib.parse
 import json
 import urllib3
 import time
+import random
 
-profit_threshold = 20
+profit_threshold = 40
 sale_threshold = 10
 
 def get_nike():
@@ -33,7 +34,7 @@ def get_nike():
 
     return product_dict
 
-def get_stockx(sku, price):
+def get_stockx(sku, price, proxy):
     json_string = json.dumps({"params": f"query={sku}&hitsPerPage=20&facets=*"})
     byte_payload = bytes(json_string, 'utf-8')
     algolia = {
@@ -49,7 +50,11 @@ def get_stockx(sku, price):
         'appversion': '0.1',
         'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36'
     }
-    r = requests.post("https://xw7sbct9v6-dsn.algolia.net/1/indexes/products/query", params=algolia, verify=False, data=byte_payload, timeout=30)
+    proxy = {
+        "https": f"https://{proxy}",
+        "http": f"http://{proxy}"
+    }
+    r = requests.post("https://xw7sbct9v6-dsn.algolia.net/1/indexes/products/query", params=algolia, verify=False, data=byte_payload, timeout=30, proxies=proxy)
     try:
         results = r.json()["hits"][0]
         apiurl = f"https://stockx.com/api/products/{results['url']}?includes=market,360&currency=USD"
@@ -67,18 +72,32 @@ def get_stockx(sku, price):
 
                 with open("stockX.txt", "a") as f:
                     f.write(f"https://nike.com/t/-/{sku} {size_list} https://stockx.com/{results['url']}\n")
-                    print(f"{sku} is profitable.")
+                    print(f"{response} {sku} is profitable.")
         except:
-            print(f"{sku} is not profitable.")
+            print(f"{response} {sku} is not profitable.")
     except:
         print(f"{sku} not found on StockX.")
 
 # def get_goat():
 
+def get_proxies(file):
+    proxy_list = []
+    with open("proxies.txt") as f:
+        for proxy in f:
+            p = proxy.split(":")
+            try:
+                proxy_list.append(f"{p[2]}:{p[3]}@{p[0]}:{p[1]}/")
+            except:
+                proxy_list.append(f"{p[0]}:{p[1]}/")
+    return proxy_list
+
 def main():
     products = get_nike()
+    proxy_list = get_proxies("proxies.txt")
     for sku, price in products.items():
-        get_stockx(sku, price)
+        proxy = random.choice(proxy_list)
+        get_stockx(sku, price, proxy)
+        time.sleep(1)
 
 if __name__ == "__main__":
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
